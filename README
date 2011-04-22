@@ -1,0 +1,10 @@
+This is a simple wrapper around Go's rpc package to allow
+a Go server, running as root, to call RPCs running as a
+different user in a child process.
+
+See example.go
+
+Enjoy.
+
+Note: this is currently more of a proof of concept and not incredibly
+polished, but it seems to work. :)
