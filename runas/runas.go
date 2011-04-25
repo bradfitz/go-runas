@@ -95,48 +95,47 @@ func UidGid(uid, gid int) (*rpc.Client, os.Error) {
 		panic(err.String())
 	}
 	c := rpc.NewClient(&splitReadWrite{cmd.Stdout, cmd.Stdin})
-	var res InternalDropResult
-	err = c.Call("InternalGoRunAs.DropPrivileges",
-		&InternalDropArg{Uid: uid, Gid: gid}, &res)
-	if res.UidDropped != true || res.GidDropped != true {
+
+	// These are embedded in structs and named with a capital R to make
+	// reflect & rpc happy. That way we don't have to export them
+	// in our go doc.
+	var res struct{R internalDropResult}
+	var req struct{R internalDropArg}
+	req.R.Uid = uid
+	req.R.Gid = gid
+	err = c.Call("InternalGoRunAs.DropPrivileges", &req, &res)
+	if res.R.UidDropped != true || res.R.GidDropped != true {
 		return nil, fmt.Errorf("runas: failed to drop root to %d/%d: %v", uid, gid, res)
 	}
 	return c, nil
 }
 
-// InternalService is an internal detail. It's only exported because
-// the rpc package requires it to be.
-type InternalService struct {
-
+type internalService struct {
 }
 
-// InternalDropArg is an internal detail. It's only exported because
-// the rpc package requires it to be.
-type InternalDropArg struct {
+type internalDropArg struct {
 	Uid, Gid int
 }
 
-// InternalDropResult is an internal detail. It's only exported
-// because the rpc package requires it to be.
-type InternalDropResult struct {
+type internalDropResult struct {
 	UidDropped, GidDropped   bool
 	SetuidErrno, SetgidErrno int
 }
 
-func (s *InternalService) DropPrivileges(arg *InternalDropArg, result *InternalDropResult) os.Error {
-	if rv := syscall.Setgid(arg.Gid); rv != 0 {
-		result.SetgidErrno = rv
+func (s *internalService) DropPrivileges(arg *struct{R internalDropArg}, result *struct{R internalDropResult}) os.Error {
+	if rv := syscall.Setgid(arg.R.Gid); rv != 0 {
+		result.R.SetgidErrno = rv
 	} else {
-		result.GidDropped = true
+		result.R.GidDropped = true
 	}
-	if rv := syscall.Setuid(arg.Uid); rv != 0 {
-		result.SetuidErrno = rv
+	if rv := syscall.Setuid(arg.R.Uid); rv != 0 {
+		result.R.SetuidErrno = rv
 	} else {
-		result.UidDropped = true
+		result.R.UidDropped = true
 	}
 	return nil
 }
 
 func init() {
-	Server.RegisterName("InternalGoRunAs", &InternalService{})
+	Server.RegisterName("InternalGoRunAs", &internalService{})
 }
