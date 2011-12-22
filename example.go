@@ -49,6 +49,6 @@ func main() {
 			continue
 		}
 		client.Call("DemoService.WhoAmI", true, &res)
-		log.Printf("user %s: %v", user, res)
+		log.Printf("for runas user %s, got: %#v", user, res)
 	}
 }

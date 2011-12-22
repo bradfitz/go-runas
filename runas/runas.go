@@ -84,17 +84,22 @@ func UidGid(uid, gid int) (*rpc.Client, error) {
 		panic("runas.MaybeRunChildServer() never called")
 	}
 	binary, _ := filepath.Abs(os.Args[0])
-	cmd, err := exec.Run(binary,
-		[]string{os.Args[0]},
-		[]string{"BECOME_GO_RUNAS_CHILD=1"},
-		"/",
-		exec.Pipe,
-		exec.Pipe,
-		exec.DevNull)
+	cmd := exec.Command(binary)
+	cmd.Dir = "/"
+	cmd.Env = []string{"BECOME_GO_RUNAS_CHILD=1"}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		panic(err)
+	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		panic(err)
+	}
+	err = cmd.Start()
 	if err != nil {
 		panic(err.Error())
 	}
-	c := rpc.NewClient(&splitReadWrite{cmd.Stdout, cmd.Stdin})
+	c := rpc.NewClient(&splitReadWrite{stdout, stdin})
 
 	// These are embedded in structs and named with a capital R to make
 	// reflect & rpc happy. That way we don't have to export them
@@ -119,17 +124,17 @@ type internalDropArg struct {
 
 type internalDropResult struct {
 	UidDropped, GidDropped   bool
-	SetuidErrno, SetgidErrno int
+	SetuidErrno, SetgidErrno uintptr
 }
 
 func (s *internalService) DropPrivileges(arg *struct{ R internalDropArg }, result *struct{ R internalDropResult }) error {
-	if rv := syscall.Setgid(arg.R.Gid); rv != 0 {
-		result.R.SetgidErrno = rv
+	if rv := syscall.Setgid(arg.R.Gid); rv != nil {
+		result.R.SetgidErrno = uintptr(rv.(syscall.Errno))
 	} else {
 		result.R.GidDropped = true
 	}
-	if rv := syscall.Setuid(arg.R.Uid); rv != 0 {
-		result.R.SetuidErrno = rv
+	if rv := syscall.Setuid(arg.R.Uid); rv != nil {
+		result.R.SetuidErrno = uintptr(rv.(syscall.Errno))
 	} else {
 		result.R.UidDropped = true
 	}
