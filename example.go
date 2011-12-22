@@ -19,7 +19,6 @@ limitations under the License.
 package main
 
 import (
-	"os"
 	"log"
 	"syscall"
 
@@ -32,7 +31,7 @@ type WhoAmIResult struct {
 	Uid, Gid int
 }
 
-func (s *DemoService) WhoAmI(unused *bool, res *WhoAmIResult) os.Error {
+func (s *DemoService) WhoAmI(unused *bool, res *WhoAmIResult) error {
 	res.Uid = syscall.Getuid()
 	res.Gid = syscall.Getgid()
 	return nil

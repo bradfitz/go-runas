@@ -19,14 +19,14 @@ limitations under the License.
 package runas
 
 import (
-	"exec"
 	"fmt"
 	"io"
 	"log"
+	"net/rpc"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
-	"rpc"
 	"syscall"
 )
 
@@ -43,7 +43,7 @@ type splitReadWrite struct {
 	io.Writer
 }
 
-func (s *splitReadWrite) Close() os.Error {
+func (s *splitReadWrite) Close() error {
 	if c, ok := s.Reader.(io.Closer); ok {
 		c.Close()
 	}
@@ -69,7 +69,7 @@ func MaybeRunChildServer() {
 
 // User returns an rpc Client suitable for talking to Server
 // running as the provided user.
-func User(username string) (*rpc.Client, os.Error) {
+func User(username string) (*rpc.Client, error) {
 	u, err := user.Lookup(username)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func User(username string) (*rpc.Client, os.Error) {
 
 // UidGid returns an rpc Client suitable for talking to Server
 // running as the provided userid and group id.
-func UidGid(uid, gid int) (*rpc.Client, os.Error) {
+func UidGid(uid, gid int) (*rpc.Client, error) {
 	if !doneInit {
 		panic("runas.MaybeRunChildServer() never called")
 	}
@@ -92,15 +92,15 @@ func UidGid(uid, gid int) (*rpc.Client, os.Error) {
 		exec.Pipe,
 		exec.DevNull)
 	if err != nil {
-		panic(err.String())
+		panic(err.Error())
 	}
 	c := rpc.NewClient(&splitReadWrite{cmd.Stdout, cmd.Stdin})
 
 	// These are embedded in structs and named with a capital R to make
 	// reflect & rpc happy. That way we don't have to export them
 	// in our go doc.
-	var res struct{R internalDropResult}
-	var req struct{R internalDropArg}
+	var res struct{ R internalDropResult }
+	var req struct{ R internalDropArg }
 	req.R.Uid = uid
 	req.R.Gid = gid
 	err = c.Call("InternalGoRunAs.DropPrivileges", &req, &res)
@@ -122,7 +122,7 @@ type internalDropResult struct {
 	SetuidErrno, SetgidErrno int
 }
 
-func (s *internalService) DropPrivileges(arg *struct{R internalDropArg}, result *struct{R internalDropResult}) os.Error {
+func (s *internalService) DropPrivileges(arg *struct{ R internalDropArg }, result *struct{ R internalDropResult }) error {
 	if rv := syscall.Setgid(arg.R.Gid); rv != 0 {
 		result.R.SetgidErrno = rv
 	} else {
