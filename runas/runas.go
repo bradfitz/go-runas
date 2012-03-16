@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"syscall"
 )
 
@@ -74,7 +75,9 @@ func User(username string) (*rpc.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return UidGid(u.Uid, u.Gid)
+	uid, _ := strconv.Atoi(u.Uid)
+	gid, _ := strconv.Atoi(u.Gid)
+	return UidGid(uid, gid)
 }
 
 // UidGid returns an rpc Client suitable for talking to Server
